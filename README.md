@@ -1,16 +1,16 @@
-# React + Vite
+# React 스터디 과제
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 스터디에서 진행한 주차별 과제를 기록하는 저장소입니다.
 
-Currently, two official plugins are available:
+## 과제 목록
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+### 1주차 - 투두리스트
 
-## React Compiler
+- state와 props를 활용한 할 일 관리
+- 할 일 추가, 완료, 삭제
+- 글자 수 제한 및 조건부 렌더링
+- Random User API 호출
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 2주차
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- 추후 작성
