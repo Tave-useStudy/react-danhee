@@ -13,8 +13,6 @@
 5. `js-tosorted-immutable.md`
 6. `react19-no-forwardref.md`
 
-이 문서의 Before 코드는 GitHub의 `feat: 1주차 투두리스트 과제` 커밋(`90f4e55`)을 기준으로 작성했다. 1주차부터 이미 적용되어 있던 rule은 가상의 이전 코드를 만들지 않고, 기존 적용 내용을 2주차 기능에도 유지·확장한 과정으로 정리했다.
-
 ---
 
 ## 1. 함수형 setState를 수정 기능까지 확장
