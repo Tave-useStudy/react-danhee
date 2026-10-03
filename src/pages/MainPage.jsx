@@ -5,7 +5,25 @@ import TextInput from "../components/TextInput";
 import TaskList from "../components/TaskList";
 import UserProfile from "../components/UserProfile";
 
-    export default function MainPage({todos, addTodo, updateTodoStatus, deleteTodo, updateTodoText}) {
+import styles from "./MainPage.module.css";
+
+    function getTodoOrder(todo) {
+    if (typeof todo.id === "number") {
+        return todo.id;
+    }
+
+    const numberPart = String(todo.id).match(
+        /\d+$/
+    );
+
+    if (!numberPart) {
+        return 0;
+    }
+
+    return Number(numberPart[0]);
+    }
+
+    export default function MainPage({todos, status, error, addTodo, updateTodoStatus, deleteTodo, updateTodoText, loadApiTodos}) {
         const [categoryFilter, setCategoryFilter] = useState("all");
         const [statusFilter, setStatusFilter] = useState("all");
         const [sortType, setSortType] = useState("latest");
@@ -42,21 +60,66 @@ import UserProfile from "../components/UserProfile";
     };
 
     //정렬
-    const sortedTodos = statusFilteredTodos.toSorted(
-        (a,b) => {
-            if (sortType === "priority") {
-                return (
-                    priorityOrder[a.priority] - priorityOrder[b.priority]
-                );
-            }
+    const sortedTodos =
+    statusFilteredTodos.toSorted((a, b) => {
+        if (sortType === "priority") {
+            const aPriority =
+            priorityOrder[a.priority] ?? 999;
 
-            if (sortType === "oldest") {
-                return a.id - b.id;
-            }
+            const bPriority =
+            priorityOrder[b.priority] ?? 999;
 
-            return b.id - a.id;
+            return aPriority - bPriority;
         }
+
+        if (sortType === "oldest") {
+            return (
+            getTodoOrder(a) - getTodoOrder(b)
+            );
+        }
+
+        if (sortType === "latest") {
+            return (
+            getTodoOrder(b) - getTodoOrder(a)
+            );
+        }
+
+        return 0;
+        });
+
+    if (status === "loading") {
+    return (
+        <div className={styles.loadingContainer}>
+        <div
+            className={styles.spinner}
+            aria-hidden="true"
+        />
+
+        <p>투두를 불러오는 중입니다...</p>
+        </div>
     );
+    }
+
+    if (status === "error") {
+    return (
+        <div
+        className={styles.errorContainer}
+        role="alert"
+        >
+        <p>
+            {error ||
+            "투두를 불러오지 못했습니다."}
+        </p>
+
+        <button
+            type="button"
+            onClick={() => loadApiTodos()}
+        >
+            다시 시도
+        </button>
+        </div>
+    );
+    }
 
     return (
         <div>

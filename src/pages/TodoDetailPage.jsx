@@ -4,14 +4,14 @@ export default function TodoDetailPage({todos}) {
     const { id } = useParams();
     const navigate = useNavigate();
 
-    const todo = todos.find((todo) => todo.id ===Number(id));
+    const todo = todos.find((todo) => String(todo.id) ===String(id));
     
     if (!todo) {
         return (
             <div>
                 <h1>할 일을 찾을 수 없습니다.</h1>
 
-                <button onClick={() => navigate("/")}>메인으로</button>
+                <button type="button" onClick={() => navigate("/")}>메인으로</button>
             </div>
         );
     }
