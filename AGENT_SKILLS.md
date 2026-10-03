@@ -2,9 +2,9 @@
 
 ## 프로젝트 개요
 
-기존 투두리스트에 할 일 수정, 카테고리 필터링, 우선순위 정렬, 완료 상태 필터, React Router 페이지 분리 기능을 추가했다.
+기존 투두리스트에 할 일 수정, 카테고리·상태 필터링, 우선순위 정렬, React Router 페이지 분리 기능을 추가했다. 이후 todo 상태를 `useState`에서 `useReducer`로 전환하고, localStorage 데이터 영속화와 JSONPlaceholder Todo API 연동, 로딩·에러·재시도 처리까지 확장했다.
 
-기능을 구현하면서 다음 여섯 가지 agent-skill을 코드에 적용하거나 기존 방식과 비교했다.
+기능을 구현하면서 다음 열세 가지 agent-skill을 코드에 적용하거나 현재 구조와 비교했다.
 
 1. `rerender-functional-setstate.md`
 2. `rerender-move-effect-to-event.md`
@@ -12,6 +12,13 @@
 4. `js-early-exit.md`
 5. `js-tosorted-immutable.md`
 6. `react19-no-forwardref.md`
+7. `async-parallel.md`
+8. `async-defer-await.md`
+9. `rerender-derived-state-no-effect.md`
+10. `rerender-lazy-state-init.md`
+11. `client-localstorage-schema.md`
+12. `rerender-dependencies.md`
+13. `js-set-map-lookups.md`
 
 ---
 
@@ -375,6 +382,19 @@ const priorityOrder = {
 };
 ```
 
+직접 만든 숫자 ID와 `api-1` 형태의 문자열 ID를 함께 정렬하기 위해 비교값을 구하는 함수를 추가했다.
+
+```jsx
+function getTodoOrder(todo) {
+  if (typeof todo.id === "number") {
+    return todo.id;
+  }
+
+  const numberPart = String(todo.id).match(/\d+$/);
+  return numberPart ? Number(numberPart[0]) : 0;
+}
+```
+
 ```jsx
 const sortedTodos = statusFilteredTodos.toSorted((a, b) => {
   if (sortType === "priority") {
@@ -385,10 +405,10 @@ const sortedTodos = statusFilteredTodos.toSorted((a, b) => {
   }
 
   if (sortType === "oldest") {
-    return a.id - b.id;
+    return getTodoOrder(a) - getTodoOrder(b);
   }
 
-  return b.id - a.id;
+  return getTodoOrder(b) - getTodoOrder(a);
 });
 ```
 
@@ -462,6 +482,398 @@ function TodoTextInput({ ref, ...props }) {
 현재 투두리스트에는 부모가 자식 input의 DOM 요소를 제어하는 기능이 없으므로 `ref`나 `forwardRef`를 추가하지 않았다. 필요하지 않은 컴포넌트와 로직을 억지로 추가하지 않아 현재 구조를 단순하게 유지했다.
 
 추후 input 자동 포커스처럼 `ref` 전달이 필요한 기능을 추가한다면 React 19의 ref prop 방식을 사용할 수 있다. 따라서 이 항목은 실제 기능 적용이 아니라 React 18 방식과 React 19 방식의 차이를 학습하고 비교한 기록이다.
+
+---
+
+## 7. 독립적인 비동기 작업의 병렬 처리 여부 확인
+
+### 문제 (내 코드)
+
+프로젝트에서는 JSONPlaceholder Todo API와 Random User API를 사용한다. 두 API가 존재하기 때문에 `Promise.all()`로 동시에 요청해야 하는지 확인할 필요가 있었다.
+
+### 적용한 rule
+
+`async-parallel.md`
+
+서로 독립적이면서 하나의 작업을 완료하기 위해 모든 결과가 필요한 경우에는 `Promise.all()`을 사용한다. 반대로 서로 다른 컴포넌트가 각자 필요한 데이터를 요청한다면 하나의 `Promise.all()`로 억지로 묶지 않는다.
+
+### 현재 코드
+
+Todo API는 `App.jsx`에서 투두 목록을 불러오기 위해 사용한다.
+
+```jsx
+const apiTodos = await fetchTodos(signal);
+```
+
+Random User API는 `UserProfile.jsx`에서 사용자 정보를 불러오기 위해 사용한다.
+
+```jsx
+const response = await fetch(
+  "https://randomuser.me/api/"
+);
+```
+
+두 요청은 서로 다른 컴포넌트와 상태를 담당하므로 다음처럼 강제로 묶지 않았다.
+
+```jsx
+// 현재 구조에서는 사용하지 않음
+const [todos, user] = await Promise.all([
+  fetchTodos(),
+  fetchUser(),
+]);
+```
+
+### 결과
+
+비동기 요청이 여러 개 있다는 이유만으로 `Promise.all()`을 사용하지 않았다. 추후 하나의 화면을 보여주기 위해 두 API 결과가 모두 필요한 기능이 추가된다면 병렬 요청을 적용할 수 있다.
+
+---
+
+## 8. 결과가 필요한 시점에 await 사용
+
+### 문제 (내 코드)
+
+Todo API 요청에서는 서버 응답을 받은 뒤 응답 상태를 확인하고, 그다음 JSON 데이터를 변환해야 한다. 각 작업은 이전 작업의 결과가 필요하므로 실행 순서를 명확하게 관리해야 했다.
+
+### 적용한 rule
+
+`async-defer-await.md`
+
+Promise의 결과가 실제로 필요한 위치에서 `await`한다. 다만 다음 작업이 이전 비동기 작업의 결과에 의존한다면 순차적으로 기다린다.
+
+### 적용 코드
+
+```jsx
+export async function fetchTodos(signal) {
+  const response = await fetch(
+    "https://jsonplaceholder.typicode.com/todos",
+    { signal }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `투두를 불러오지 못했습니다. (${response.status})`
+    );
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data)) {
+    throw new Error(
+      "올바르지 않은 투두 데이터입니다."
+    );
+  }
+
+  return data.slice(0, 10).map((todo) => ({
+    id: `api-${todo.id}`,
+    text: todo.title,
+    category: "daily",
+    priority: "medium",
+    done: todo.completed,
+  }));
+}
+```
+
+### 결과
+
+`fetch()`의 결과가 있어야 `response.ok`를 검사할 수 있고, `response`가 있어야 JSON을 변환할 수 있으므로 두 작업을 순차적으로 처리했다. API 데이터가 필요한 시점에만 기다리고 성공 여부와 데이터 구조를 확인한 뒤 상태를 변경하게 되었다.
+
+---
+
+## 9. 필터와 정렬 결과를 Effect 없이 계산
+
+### 문제 (내 코드)
+
+카테고리 필터, 완료 상태 필터, 정렬 결과는 모두 원본 `todos`와 사용자가 선택한 조건으로부터 계산할 수 있다. 이를 별도의 state로 저장하면 원본 데이터가 변경될 때마다 Effect로 다시 동기화해야 한다.
+
+### Before
+
+```jsx
+const [filteredTodos, setFilteredTodos] =
+  useState([]);
+
+useEffect(() => {
+  setFilteredTodos(
+    todos.filter((todo) => todo.done)
+  );
+}, [todos]);
+```
+
+### 적용한 rule
+
+`rerender-derived-state-no-effect.md`
+
+기존 props나 state로 계산할 수 있는 값은 새로운 state와 Effect에 저장하지 않고 렌더링 과정에서 바로 계산한다.
+
+### After
+
+```jsx
+const categoryFilteredTodos = todos.filter((todo) => {
+  if (categoryFilter === "all") return true;
+  return todo.category === categoryFilter;
+});
+
+const statusFilteredTodos = categoryFilteredTodos.filter(
+  (todo) => {
+    if (statusFilter === "completed") return todo.done;
+    if (statusFilter === "active") return !todo.done;
+    return true;
+  }
+);
+
+const sortedTodos = statusFilteredTodos.toSorted((a, b) => {
+  if (sortType === "priority") {
+    return priorityOrder[a.priority] - priorityOrder[b.priority];
+  }
+
+  if (sortType === "oldest") {
+    return getTodoOrder(a) - getTodoOrder(b);
+  }
+
+  return getTodoOrder(b) - getTodoOrder(a);
+});
+```
+
+### 결과
+
+화면에 보여줄 목록은 `todos → categoryFilteredTodos → statusFilteredTodos → sortedTodos` 순서로 계산된다. 필터와 정렬 결과를 별도 state에 저장하지 않아 원본 데이터와 파생 데이터가 달라지는 문제와 불필요한 렌더링을 예방했다.
+
+---
+
+## 10. 지연 초기화로 localStorage를 처음 한 번만 읽기
+
+### 문제 (내 코드)
+
+새로고침 후에도 todo를 유지하려면 앱을 처음 실행할 때 localStorage의 데이터를 불러와야 한다. 렌더링 본문에서 직접 `loadValue()`를 실행하면 컴포넌트가 다시 렌더링될 때마다 저장소를 읽을 수 있다.
+
+### Before
+
+```jsx
+const savedTodos = loadValue([]);
+
+const [state, dispatch] = useReducer(
+  todoReducer,
+  {
+    ...initialTodoState,
+    todos: savedTodos,
+  }
+);
+```
+
+### 적용한 rule
+
+`rerender-lazy-state-init.md`
+
+초기 상태를 만드는 비용이 있거나 저장소에서 값을 불러와야 할 때는 `useReducer`의 세 번째 인자인 지연 초기화 함수를 사용한다.
+
+### After
+
+```jsx
+const [state, dispatch] = useReducer(
+  todoReducer,
+  initialTodoState,
+  (initialState) => {
+    const savedTodos = loadValue([]);
+
+    return {
+      ...initialState,
+      todos: savedTodos,
+    };
+  }
+);
+```
+
+### 결과
+
+localStorage는 reducer의 초기 상태를 만들 때만 읽는다. 컴포넌트가 다시 렌더링되어도 저장 데이터를 반복해서 읽지 않으며, 저장된 todo가 없으면 빈 배열을 사용한다.
+
+---
+
+## 11. 버전을 포함한 localStorage 스키마 구성
+
+### 문제 (내 코드)
+
+todo 배열만 바로 저장하면 이후 데이터 구조가 변경됐을 때 기존 데이터와 새로운 데이터를 구분하기 어렵다. localStorage에는 사용자가 직접 수정한 값이나 잘못된 JSON이 저장될 수도 있다.
+
+### Before
+
+```jsx
+localStorage.setItem(
+  "todo-data",
+  JSON.stringify(todos)
+);
+```
+
+### 적용한 rule
+
+`client-localstorage-schema.md`
+
+localStorage 데이터에는 버전을 포함하고, 불러올 때 예상한 구조인지 검증한다. JSON 파싱에 실패하거나 스키마가 다르면 안전한 기본값을 사용한다.
+
+### After
+
+저장:
+
+```jsx
+const value = {
+  version: 1,
+  todos,
+};
+
+localStorage.setItem(
+  key,
+  JSON.stringify(value)
+);
+```
+
+불러오기:
+
+```jsx
+const parsedValue = JSON.parse(savedValue);
+
+if (
+  parsedValue.version !== 1 ||
+  !Array.isArray(parsedValue.todos)
+) {
+  return fallbackValue;
+}
+
+return parsedValue.todos;
+```
+
+### 결과
+
+localStorage에는 `{ version: 1, todos: [...] }` 구조로 데이터가 저장된다. 데이터가 없거나 JSON 파싱에 실패하거나 `todos`가 배열이 아니면 기본값을 사용해 잘못된 저장 데이터 때문에 앱이 중단되는 문제를 예방했다.
+
+---
+
+## 12. Effect와 Callback의 의존성 명시
+
+### 문제 (내 코드)
+
+localStorage 저장 Effect와 API 호출 Effect는 외부에서 선언된 함수와 상태를 사용한다. 의존성 배열에서 이를 누락하면 Effect가 이전 값을 참조하거나 실행 시점을 파악하기 어려울 수 있다.
+
+### 적용한 rule
+
+`rerender-dependencies.md`
+
+Effect와 Callback 내부에서 사용하는 반응형 값을 의존성 배열에 명시하고, Effect에서 사용하는 함수는 필요할 때 `useCallback`으로 참조를 안정화한다.
+
+### 적용 코드
+
+localStorage 저장:
+
+```jsx
+useEffect(() => {
+  saveValue(state.todos);
+}, [state.todos, saveValue]);
+```
+
+API 요청 함수:
+
+```jsx
+const loadApiTodos = useCallback(
+  async (signal) => {
+    dispatch({ type: "FETCH_START" });
+
+    try {
+      const apiTodos = await fetchTodos(signal);
+
+      dispatch({
+        type: "FETCH_SUCCESS",
+        payload: apiTodos,
+      });
+    } catch (error) {
+      if (error.name === "AbortError") return;
+
+      dispatch({
+        type: "FETCH_ERROR",
+        payload: error.message,
+      });
+    }
+  },
+  []
+);
+```
+
+API 호출 Effect:
+
+```jsx
+useEffect(() => {
+  if (hasSavedTodos.current) return;
+
+  const controller = new AbortController();
+  loadApiTodos(controller.signal);
+
+  return () => {
+    controller.abort();
+  };
+}, [loadApiTodos]);
+```
+
+### 결과
+
+localStorage 저장은 `state.todos`가 변경될 때 실행되고 API Effect는 안정된 `loadApiTodos` 함수를 사용한다. Effect에서 사용하는 값과 의존성 배열의 관계가 명확해졌으며 요청 취소도 cleanup에서 처리했다.
+
+---
+
+## 13. Set과 Map 사용 여부 비교
+
+### 문제 (내 코드)
+
+API todo와 사용자가 만든 todo가 함께 존재하기 때문에 ID 조회나 중복 제거에 `Set` 또는 `Map`을 사용해야 하는지 검토했다.
+
+### 적용한 rule
+
+`js-set-map-lookups.md`
+
+ID 포함 여부를 반복해서 검사하거나 같은 배열에서 여러 번 조회한다면 `Set` 또는 `Map`을 사용할 수 있다. 데이터가 적고 조회가 한 번뿐이라면 `find()`, `filter()`, `map()`이 더 단순하다.
+
+### 현재 코드
+
+API에서는 todo를 10개만 불러온다.
+
+```jsx
+return data.slice(0, 10).map((todo) => ({
+  id: `api-${todo.id}`,
+  text: todo.title,
+  category: "daily",
+  priority: "medium",
+  done: todo.completed,
+}));
+```
+
+저장된 todo가 있으면 API 요청을 생략하기 때문에 기존 목록과 API 목록을 병합하며 중복을 제거하는 작업도 없다.
+
+```jsx
+if (hasSavedTodos.current) {
+  return;
+}
+```
+
+상세 페이지에서는 하나의 todo만 찾기 때문에 `find()`를 유지했다.
+
+```jsx
+const todo = todos.find(
+  (todo) => String(todo.id) === String(id)
+);
+```
+
+추후 두 목록을 병합한다면 다음처럼 `Set`을 사용할 수 있다.
+
+```jsx
+const existingIds = new Set(
+  state.todos.map((todo) => String(todo.id))
+);
+
+const uniqueApiTodos = apiTodos.filter(
+  (todo) => !existingIds.has(String(todo.id))
+);
+```
+
+### 결과
+
+현재는 todo 개수가 적고 두 목록을 병합하지 않으므로 `Set`이나 `Map`을 추가하지 않았다. 자료구조를 무조건 사용하는 대신 데이터 크기와 반복 조회 여부를 기준으로 필요성을 판단했다.
 
 ---
 
@@ -602,8 +1014,11 @@ const sortedTodos = statusFilteredTodos.toSorted((a, b) => {
     return priorityOrder[a.priority] - priorityOrder[b.priority];
   }
 
-  if (sortType === "oldest") return a.id - b.id;
-  return b.id - a.id;
+  if (sortType === "oldest") {
+    return getTodoOrder(a) - getTodoOrder(b);
+  }
+
+  return getTodoOrder(b) - getTodoOrder(a);
 });
 ```
 
@@ -663,7 +1078,7 @@ const goToDetail = () => {
 const { id } = useParams();
 
 const todo = todos.find(
-  (todo) => todo.id === Number(id)
+  (todo) => String(todo.id) === String(id)
 );
 ```
 
@@ -688,6 +1103,270 @@ if (!todo) {
 
 ---
 
+## 5. useReducer로 CRUD와 API 상태 통합
+
+### 문제 (내 코드)
+
+추가, 완료 변경, 수정, 삭제 기능에 API 로딩과 에러 상태까지 더해지면서 여러 상태 변경 규칙을 한곳에서 관리할 필요가 생겼다.
+
+### Before
+
+```jsx
+const [todos, setTodos] = useState([]);
+```
+
+각 함수가 `setTodos`를 사용해 배열을 직접 변경하고 있었다.
+
+### After
+
+```jsx
+export const initialTodoState = {
+  todos: [],
+  status: "idle",
+  error: null,
+};
+```
+
+```jsx
+const [state, dispatch] = useReducer(
+  todoReducer,
+  initialTodoState,
+  (initialState) => {
+    const savedTodos = loadValue([]);
+
+    return {
+      ...initialState,
+      todos: savedTodos,
+    };
+  }
+);
+```
+
+컴포넌트에서는 실행할 작업과 필요한 데이터만 전달한다.
+
+```jsx
+dispatch({
+  type: "UPDATE_TODO",
+  payload: { id, newText },
+});
+```
+
+reducer는 액션에 따라 새로운 상태를 반환한다.
+
+```jsx
+case "UPDATE_TODO":
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === action.payload.id
+        ? {
+            ...todo,
+            text: action.payload.newText,
+          }
+        : todo
+    ),
+  };
+```
+
+API 상태도 같은 reducer에서 처리했다.
+
+```jsx
+case "FETCH_START":
+  return {
+    ...state,
+    status: "loading",
+    error: null,
+  };
+
+case "FETCH_SUCCESS":
+  return {
+    ...state,
+    todos: action.payload,
+    status: "success",
+    error: null,
+  };
+
+case "FETCH_ERROR":
+  return {
+    ...state,
+    status: "error",
+    error: action.payload,
+  };
+```
+
+### 결과
+
+CRUD와 API 상태 변경 규칙이 `todoReducer`에 모였다. 컴포넌트는 어떤 작업을 실행할지만 전달하고 reducer가 실제 상태 변경을 담당하게 되어 상태 흐름을 한곳에서 확인할 수 있게 되었다.
+
+---
+
+## 6. useLocalStorage 커스텀 훅으로 데이터 영속화
+
+### 문제 (내 코드)
+
+React state는 새로고침하면 초기화되므로 사용자가 만든 todo가 사라졌다. 저장과 불러오기 코드를 `App.jsx`에 모두 작성하면 컴포넌트의 역할도 복잡해진다.
+
+### After
+
+`useLocalStorage` 커스텀 훅에서 저장과 불러오기 함수를 제공하도록 분리했다.
+
+```jsx
+const { loadValue, saveValue } =
+  useLocalStorage("todo-data");
+```
+
+앱을 처음 실행할 때 저장된 todo를 reducer 초기값으로 사용한다.
+
+```jsx
+const [state, dispatch] = useReducer(
+  todoReducer,
+  initialTodoState,
+  (initialState) => {
+    const savedTodos = loadValue([]);
+
+    return {
+      ...initialState,
+      todos: savedTodos,
+    };
+  }
+);
+```
+
+todo가 변경되면 localStorage에 저장한다.
+
+```jsx
+useEffect(() => {
+  saveValue(state.todos);
+}, [state.todos, saveValue]);
+```
+
+### 결과
+
+추가, 수정, 완료 변경, 삭제 결과가 localStorage에 저장되어 새로고침 후에도 유지된다. 실제 저장 로직은 커스텀 훅으로 이동하고 `App.jsx`는 저장 시점만 결정하도록 역할을 분리했다.
+
+---
+
+## 7. JSONPlaceholder Todo API 연동
+
+### 문제 (내 코드)
+
+서버에서 데이터를 가져오는 비동기 처리와 서버 데이터 구조를 현재 프로젝트 구조에 맞추는 과정이 필요했다.
+
+### After
+
+API 요청 코드를 `src/api/todosApi.js`로 분리했다.
+
+```jsx
+const response = await fetch(TODOS_API_URL, {
+  signal,
+});
+
+if (!response.ok) {
+  throw new Error(
+    `투두를 불러오지 못했습니다. (${response.status})`
+  );
+}
+
+const data = await response.json();
+```
+
+API 응답을 현재 todo 구조로 변환했다.
+
+```jsx
+return data.slice(0, 10).map((todo) => ({
+  id: `api-${todo.id}`,
+  text: todo.title,
+  category: "daily",
+  priority: "medium",
+  done: todo.completed,
+}));
+```
+
+저장된 todo가 있을 때는 사용자의 데이터를 API 결과로 덮어쓰지 않도록 요청을 생략했다.
+
+```jsx
+const hasSavedTodos = useRef(
+  state.todos.length > 0
+);
+
+if (hasSavedTodos.current) {
+  return;
+}
+```
+
+### 결과
+
+저장된 데이터가 없을 때 JSONPlaceholder에서 todo 10개를 불러오며, `title`, `completed` 값을 기존 코드에서 사용하는 `text`, `done` 구조로 변환해 기존 컴포넌트를 그대로 사용할 수 있게 되었다.
+
+---
+
+## 8. 로딩·에러·재시도와 요청 cleanup
+
+### 문제 (내 코드)
+
+API 요청 중이거나 요청에 실패했을 때 아무 화면도 보여주지 않으면 사용자는 현재 상태를 알 수 없다. 또한 컴포넌트가 사라진 뒤에도 요청이 계속 진행될 수 있다.
+
+### After
+
+로딩 상태에서는 스피너를 표시했다.
+
+```jsx
+if (status === "loading") {
+  return (
+    <div className={styles.loadingContainer}>
+      <div
+        className={styles.spinner}
+        aria-hidden="true"
+      />
+      <p>투두를 불러오는 중입니다...</p>
+    </div>
+  );
+}
+```
+
+실패 상태에서는 에러 메시지와 재시도 버튼을 표시했다.
+
+```jsx
+if (status === "error") {
+  return (
+    <div role="alert">
+      <p>{error}</p>
+      <button
+        type="button"
+        onClick={() => loadApiTodos()}
+      >
+        다시 시도
+      </button>
+    </div>
+  );
+}
+```
+
+Effect cleanup에서는 진행 중인 요청을 취소했다.
+
+```jsx
+const controller = new AbortController();
+loadApiTodos(controller.signal);
+
+return () => {
+  controller.abort();
+};
+```
+
+정상적인 요청 취소는 API 오류로 처리하지 않았다.
+
+```jsx
+if (error.name === "AbortError") {
+  return;
+}
+```
+
+### 결과
+
+API 요청 중에는 로딩 스피너가 나오고, 실패하면 오류 메시지와 재시도 버튼이 표시된다. 사용자가 재시도 버튼을 누르면 이벤트 핸들러에서 API 요청을 다시 실행하며, 컴포넌트가 사라질 때는 진행 중인 요청을 정리한다.
+
+---
+
 # 최종 정리
 
 이번 과제를 통해 다음 내용을 적용했다.
@@ -702,3 +1381,15 @@ if (!todo) {
 - 입력값의 공백, 길이 제한과 API 실패 상황을 처리했다.
 - React Router로 메인, 상세, 설정 페이지를 분리했다.
 - React 19의 ref prop 방식과 기존 `forwardRef` 방식의 차이를 학습했다.
+- `useState` 기반 todo 상태를 `useReducer`로 전환했다.
+- CRUD와 API 상태 변경을 reducer 액션으로 통합했다.
+- localStorage에 데이터 버전과 todo 배열을 함께 저장했다.
+- `useReducer` 지연 초기화로 저장 데이터를 처음 한 번만 불러왔다.
+- `useLocalStorage` 커스텀 훅으로 저장 로직을 분리했다.
+- JSONPlaceholder API 데이터를 기존 todo 구조로 변환했다.
+- `async/await`, `try/catch`, `response.ok`로 비동기 요청과 오류를 처리했다.
+- 로딩 스피너, 에러 메시지와 재시도 버튼을 구현했다.
+- `AbortController`로 API 요청 cleanup을 처리했다.
+- Effect와 Callback의 의존성 배열을 명확하게 작성했다.
+- 현재 구조에 불필요한 `Promise.all()`, `Set`, `Map`은 억지로 추가하지 않았다.
+- 숫자 ID와 API 문자열 ID를 상세 조회와 정렬에서 함께 처리했다.
