@@ -20,11 +20,11 @@
         );
     }
 
-    return data.slice(0, 10).map((todo) => ({
-        id: `api-${todo.id}`,
-        text: todo.title,
-        category: "daily",
-        priority: "medium",
-        done: todo.completed,
+        return data.slice(0, 10).map((todo) => ({
+    id: `api-${todo.id}`,
+    text: todo.title,
+    category: "daily",
+    priority: "medium",
+    status: todo.completed ? "done" : "todo",
     }));
     }

@@ -1,9 +1,12 @@
 import {useState} from "react";
 import { useNavigate } from "react-router-dom";
+import { useBoard } from "../context/BoardContext";
 
 import TextInput from "../components/TextInput";
-import TaskList from "../components/TaskList";
+import Board from "../components/board/Board";
 import UserProfile from "../components/UserProfile";
+import TodoDetailModal from "../components/modal/TodoDetailModal";
+import TodoEditModal from "../components/modal/TodoEditModal";
 
 import styles from "./MainPage.module.css";
 
@@ -23,7 +26,13 @@ import styles from "./MainPage.module.css";
     return Number(numberPart[0]);
     }
 
-    export default function MainPage({todos, status, error, addTodo, updateTodoStatus, deleteTodo, updateTodoText, loadApiTodos}) {
+    export default function MainPage() {
+    const {
+        state: { todos, status, error },
+
+        actions: { addTodo,loadApiTodos },
+    } = useBoard();
+
         const [categoryFilter, setCategoryFilter] = useState("all");
         const [statusFilter, setStatusFilter] = useState("all");
         const [sortType, setSortType] = useState("latest");
@@ -39,19 +48,6 @@ import styles from "./MainPage.module.css";
         return todo.category === categoryFilter;
     });
 
-    //완료 상태 필터
-    const statusFilteredTodos = categoryFilteredTodos.filter((todo) => {
-        if(statusFilter === "completed") {
-            return todo.done;
-        }
-
-        if (statusFilter === "active") {
-            return !todo.done;
-        }
-
-        return true;
-    });
-
     //우선순위 기준
     const priorityOrder = {
         high: 1,
@@ -61,7 +57,7 @@ import styles from "./MainPage.module.css";
 
     //정렬
     const sortedTodos =
-    statusFilteredTodos.toSorted((a, b) => {
+    categoryFilteredTodos.toSorted((a, b) => {
         if (sortType === "priority") {
             const aPriority =
             priorityOrder[a.priority] ?? 999;
@@ -140,22 +136,6 @@ import styles from "./MainPage.module.css";
             <option value="exercise">운동</option>
         </select>
 
-        <h3>완료 상태</h3>
-
-        <button onClick={() => setStatusFilter("all")}>
-            전체
-        </button>
-
-        <button
-            onClick={() => setStatusFilter("completed")}
-        >
-            완료
-        </button>
-
-        <button onClick={() => setStatusFilter("active")}>
-            미완료
-        </button>
-
         <h3>정렬</h3>
 
         <select value={sortType} onChange={(e) => setSortType(e.target.value)}>
@@ -164,7 +144,28 @@ import styles from "./MainPage.module.css";
             <option value="priority">우선순위순</option>
         </select>
 
-        <TaskList todos={sortedTodos} updateTodoStatus={updateTodoStatus} deleteTodo={deleteTodo} updateTodoText={updateTodoText}></TaskList>
+    <Board>
+    <Board.Column
+        title="할 일"
+        status="todo"
+        todos={sortedTodos}
+    />
+
+    <Board.Column
+        title="진행 중"
+        status="doing"
+        todos={sortedTodos}
+    />
+
+    <Board.Column
+        title="완료"
+        status="done"
+        todos={sortedTodos}
+    />
+    </Board>
+
+    <TodoDetailModal />
+    <TodoEditModal />
 
         </div>
     );

@@ -12,12 +12,15 @@
             todos: [...state.todos, action.payload],
         };
 
-        case "TOGGLE_TODO":
+        case "MOVE_TODO":
         return {
             ...state,
             todos: state.todos.map((todo) =>
-            todo.id === action.payload
-                ? { ...todo, done: !todo.done }
+            todo.id === action.payload.id
+                ? {
+                    ...todo,
+                    status: action.payload.nextStatus,
+                }
                 : todo
             ),
         };
