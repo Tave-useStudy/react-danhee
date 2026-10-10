@@ -4,7 +4,7 @@
 
 기존 투두리스트에 할 일 수정, 카테고리·상태 필터링, 우선순위 정렬, React Router 페이지 분리 기능을 추가했다. 이후 todo 상태를 `useState`에서 `useReducer`로 전환하고, localStorage 데이터 영속화와 JSONPlaceholder Todo API 연동, 로딩·에러·재시도 처리까지 확장했다.
 
-기능을 구현하면서 다음 열세 가지 agent-skill을 코드에 적용하거나 현재 구조와 비교했다.
+기능을 구현하면서 다음 스무 가지 agent-skill을 코드에 적용하거나 현재 구조와 비교했다.
 
 1. `rerender-functional-setstate.md`
 2. `rerender-move-effect-to-event.md`
@@ -19,6 +19,13 @@
 11. `client-localstorage-schema.md`
 12. `rerender-dependencies.md`
 13. `js-set-map-lookups.md`
+14. `architecture-avoid-boolean-props.md`
+15. `architecture-compound-components.md`
+16. `patterns-explicit-variants.md`
+17. `patterns-children-over-render-props.md`
+18. `state-lift-state.md`
+19. `state-context-interface.md`
+20. `state-decouple-implementation.md`
 
 ---
 
@@ -483,6 +490,8 @@ function TodoTextInput({ ref, ...props }) {
 
 추후 input 자동 포커스처럼 `ref` 전달이 필요한 기능을 추가한다면 React 19의 ref prop 방식을 사용할 수 있다. 따라서 이 항목은 실제 기능 적용이 아니라 React 18 방식과 React 19 방식의 차이를 학습하고 비교한 기록이다.
 
+4주차에는 React 19의 Context Provider 축약 문법인 `<BoardContext value={boardValue}>`를 사용했다. 별도의 `<BoardContext.Provider>`를 작성하지 않고 Provider를 구성했다.
+
 ---
 
 ## 7. 독립적인 비동기 작업의 병렬 처리 여부 확인
@@ -874,6 +883,409 @@ const uniqueApiTodos = apiTodos.filter(
 ### 결과
 
 현재는 todo 개수가 적고 두 목록을 병합하지 않으므로 `Set`이나 `Map`을 추가하지 않았다. 자료구조를 무조건 사용하는 대신 데이터 크기와 반복 조회 여부를 기준으로 필요성을 판단했다.
+
+---
+## 14. Boolean props 대신 명확한 상태 값 사용
+
+### 문제 (내 코드)
+
+칸반 카드 상태를 `isTodo`, `isDoing`, `isDone` 같은 여러 boolean 값으로 관리하면 동시에 두 값이 `true`가 되는 불가능한 상태가 생길 수 있다.
+
+Modal도 `isDetailModal`, `isEditModal`처럼 여러 boolean 상태로 나누면 상태 조합이 복잡해질 수 있다.
+
+### 적용한 rule
+
+`architecture-avoid-boolean-props.md`
+
+여러 boolean 값 대신 하나의 명확한 상태 값을 사용했다.
+
+### 적용 코드
+
+카드 상태:
+
+```jsx
+const newTodo = {
+  id: Date.now(),
+  text,
+  status: "todo",
+  category,
+  priority,
+};
+```
+
+```jsx
+moveTodo(todo.id, "doing");
+moveTodo(todo.id, "done");
+```
+
+Modal 상태:
+
+```jsx
+const openModal = (type, todoId) => {
+  setModal({
+    type,
+    todoId,
+  });
+};
+```
+
+```jsx
+openModal("detail", todo.id);
+openModal("edit", todo.id);
+```
+
+### 결과
+
+카드는 `todo`, `doing`, `done` 중 하나의 상태만 가질 수 있다. Modal도 `detail`, `edit` 중 하나의 명확한 종류를 가지므로 불가능한 boolean 조합을 만들지 않게 되었다.
+
+---
+
+## 15. Compound Component로 관련 컴포넌트 구성
+
+### 문제 (내 코드)
+
+Board, Column, Card는 하나의 칸반보드를 구성하는 관련 컴포넌트지만 각각 별도의 이름으로 사용하면 서로의 관계가 코드에서 명확하게 드러나지 않는다.
+
+Modal도 Header, Body, Footer가 하나의 UI를 구성한다.
+
+### 적용한 rule
+
+`architecture-compound-components.md`
+
+관련된 컴포넌트를 하나의 객체에 연결해 한 세트처럼 사용할 수 있도록 구성했다.
+
+### 적용 코드
+
+Board:
+
+```jsx
+Board.Column = Column;
+Board.Card = Card;
+```
+
+```jsx
+<Board>
+  <Board.Column
+    title="할 일"
+    status="todo"
+    todos={sortedTodos}
+  />
+
+  <Board.Column
+    title="진행 중"
+    status="doing"
+    todos={sortedTodos}
+  />
+
+  <Board.Column
+    title="완료"
+    status="done"
+    todos={sortedTodos}
+  />
+</Board>
+```
+
+Modal:
+
+```jsx
+const Modal = {
+  Root: ModalRoot,
+  Header: ModalHeader,
+  Body: ModalBody,
+  Footer: ModalFooter,
+};
+```
+
+```jsx
+<Modal.Root onClose={closeModal}>
+  <Modal.Header>
+    <h2>할 일 상세</h2>
+  </Modal.Header>
+
+  <Modal.Body>
+    <p>{todo.text}</p>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <button onClick={closeModal}>
+      닫기
+    </button>
+  </Modal.Footer>
+</Modal.Root>
+```
+
+### 결과
+
+`Board.Column`, `Modal.Header`처럼 컴포넌트의 소속과 역할이 이름에 드러난다. 필요한 구성 요소를 조합할 수 있어 하나의 큰 컴포넌트에 모든 UI를 넣지 않아도 된다.
+
+---
+
+## 16. 상세·수정 Modal을 명시적인 컴포넌트로 분리
+
+### 문제 (내 코드)
+
+하나의 Modal 컴포넌트에 상세 보기와 수정 기능을 모두 넣고 조건문으로 구분하면 Modal의 역할이 많아지고 코드가 복잡해질 수 있다.
+
+### 적용한 rule
+
+`patterns-explicit-variants.md`
+
+상세 보기와 수정이라는 서로 다른 역할을 명시적인 컴포넌트로 분리했다.
+
+### 적용 코드
+
+```jsx
+<TodoDetailModal />
+<TodoEditModal />
+```
+
+상세 Modal:
+
+```jsx
+if (
+  !modal ||
+  modal.type !== "detail"
+) {
+  return null;
+}
+```
+
+수정 Modal:
+
+```jsx
+if (
+  !modal ||
+  modal.type !== "edit"
+) {
+  return null;
+}
+```
+
+### 결과
+
+`TodoDetailModal`은 정보 표시를 담당하고 `TodoEditModal`은 입력과 저장을 담당한다. 각 Modal이 어떤 기능을 제공하는지 컴포넌트 이름만으로 알 수 있게 되었다.
+
+---
+
+## 17. Render props 대신 children으로 UI 조합
+
+### 문제 (내 코드)
+
+Board와 Modal의 내부 화면을 `renderColumn`, `renderHeader`, `renderBody` 같은 함수 props로 전달하면 사용 방법이 복잡해질 수 있다.
+
+### 적용한 rule
+
+`patterns-children-over-render-props.md`
+
+부모 컴포넌트의 태그 사이에 JSX를 작성하고 `children`으로 전달했다.
+
+### 적용 코드
+
+Board:
+
+```jsx
+function Board({ children }) {
+  return (
+    <main className="board">
+      {children}
+    </main>
+  );
+}
+```
+
+Modal:
+
+```jsx
+function ModalBody({ children }) {
+  return (
+    <div className="modal-body">
+      {children}
+    </div>
+  );
+}
+```
+
+사용:
+
+```jsx
+<Modal.Body>
+  <p>내용: {todo.text}</p>
+  <p>카테고리: {todo.category}</p>
+  <p>우선순위: {todo.priority}</p>
+</Modal.Body>
+```
+
+### 결과
+
+콜백 함수를 전달하지 않고 일반 JSX 구조처럼 UI를 작성할 수 있게 되었다. Board와 Modal의 틀은 재사용하면서 내부 내용은 필요한 형태로 조합할 수 있다.
+
+---
+
+## 18. 공유 상태를 BoardProvider로 끌어올리기
+
+### 문제 (내 코드)
+
+처음에는 todo 상태와 변경 함수가 `App.jsx`에 있었다. MainPage, Card, 상세 페이지, Modal 등 여러 컴포넌트가 같은 상태를 사용하면서 많은 props를 전달해야 했다.
+
+### 적용한 rule
+
+`state-lift-state.md`
+
+여러 컴포넌트가 사용하는 상태를 공통 상위 Provider로 이동했다.
+
+### 적용 코드
+
+```jsx
+export function BoardProvider({
+  children,
+}) {
+  const [state, dispatch] = useReducer(
+    todoReducer,
+    initialTodoState,
+    initializeTodoState
+  );
+
+  return (
+    <BoardContext value={boardValue}>
+      {children}
+    </BoardContext>
+  );
+}
+```
+
+```jsx
+<BrowserRouter>
+  <BoardProvider>
+    <App />
+  </BoardProvider>
+</BrowserRouter>
+```
+
+### 결과
+
+MainPage, Card, TodoDetailPage, Modal이 같은 todo 상태와 변경 함수를 사용할 수 있게 되었다. 컴포넌트가 화면상 어디에 있느냐가 아니라 `BoardProvider` 안에 있느냐를 기준으로 상태를 공유한다.
+
+---
+
+## 19. Context 값을 state와 actions로 구분
+
+### 문제 (내 코드)
+
+Context에 여러 값과 함수를 구분 없이 넣으면 어떤 값이 현재 상태이고 어떤 함수가 상태를 변경하는지 파악하기 어렵다.
+
+### 적용한 rule
+
+`state-context-interface.md`
+
+Context 값을 `state`와 `actions`로 구분해 명확한 인터페이스를 만들었다.
+
+### 적용 코드
+
+```jsx
+const boardValue = {
+  state: {
+    todos: state.todos,
+    status: state.status,
+    error: state.error,
+    modal,
+  },
+
+  actions: {
+    addTodo,
+    moveTodo,
+    deleteTodo,
+    updateTodoText,
+    loadApiTodos,
+    openModal,
+    closeModal,
+  },
+};
+```
+
+컴포넌트에서는 필요한 값만 가져온다.
+
+```jsx
+const {
+  state: { todos },
+  actions: {
+    moveTodo,
+    deleteTodo,
+  },
+} = useBoard();
+```
+
+### 결과
+
+Context의 데이터 구조가 명확해졌다. 상태를 읽는 값과 상태를 변경하는 함수를 쉽게 구분할 수 있고, 여러 컴포넌트에서 같은 사용 방식을 유지할 수 있게 되었다.
+
+---
+
+## 20. 상태 관리 구현과 UI 컴포넌트 분리
+
+### 문제 (내 코드)
+
+기존 `App.jsx`는 `useReducer`, localStorage, API 요청, CRUD 함수, Modal 상태, 라우팅을 모두 관리하고 있었다. 상태 관리 코드와 화면 구성이 한 파일에 섞여 있었다.
+
+### 적용한 rule
+
+`state-decouple-implementation.md`
+
+상태 관리 구현은 `BoardProvider`로 이동하고 UI 컴포넌트는 Context 인터페이스만 사용하도록 변경했다.
+
+### 적용 코드
+
+`BoardContext.jsx`에서 관리하는 내용:
+
+```jsx
+const [state, dispatch] = useReducer(
+  todoReducer,
+  initialTodoState,
+  initializeTodoState
+);
+
+const [modal, setModal] =
+  useState(null);
+```
+
+UI 컴포넌트는 구현 방법을 모르고 `useBoard()`만 사용한다.
+
+```jsx
+const {
+  actions: {
+    moveTodo,
+    openModal,
+  },
+} = useBoard();
+```
+
+`App.jsx`는 라우팅만 담당한다.
+
+```jsx
+export default function App() {
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={<MainPage />}
+      />
+
+      <Route
+        path="/todos/:id"
+        element={<TodoDetailPage />}
+      />
+
+      <Route
+        path="/settings"
+        element={<SettingsPage />}
+      />
+    </Routes>
+  );
+}
+```
+
+### 결과
+
+todo 상태가 `useReducer`, Zustand 또는 다른 방식으로 변경되어도 UI 컴포넌트는 동일한 Context 인터페이스를 사용할 수 있다. 상태 관리 책임과 화면 표시 책임이 분리되어 파일별 역할이 명확해졌다.
 
 ---
 
