@@ -45,22 +45,41 @@ React 스터디에서 진행한 주차별 과제를 기록하는 저장소입니
 - `AbortController`를 활용한 API 요청 cleanup
 - 숫자 ID와 API 문자열 ID를 함께 처리하도록 상세 조회와 정렬 개선
 
+### 4주차 - 칸반보드와 Context API
+
+- 기존 투두리스트를 칸반보드 구조로 확장
+- `Board / Column / Card` 역할 기반 컴포넌트 분리
+- `todo / doing / done` 상태를 이용한 카드 이동
+- `children`을 활용한 재사용 가능한 Board 구조 구현
+- `Board.Column`, `Board.Card` compound component 적용
+- Context API를 활용한 전역 todo 상태 공유
+- `state`와 `actions`로 Context 인터페이스 분리
+- `BoardProvider`로 상태 관리와 UI 컴포넌트 분리
+- props drilling을 제거하고 `useBoard` 커스텀 훅 사용
+- 상세·수정 Modal 구현
+- `Modal.Root`, `Modal.Header`, `Modal.Body`, `Modal.Footer` compound 구조 적용
+- boolean 상태 대신 `modal.type`을 사용해 Modal 종류 구분
+- 기존 localStorage 데이터를 칸반 상태 구조로 변환
+
 ## 주요 기능
 
 | 기능 | 설명 |
 | --- | --- |
 | 할 일 추가 | 내용, 카테고리, 우선순위를 선택해 새로운 할 일을 추가합니다. |
-| 할 일 수정 | 수정 버튼을 누르면 input으로 전환되며 저장하거나 취소할 수 있습니다. |
-| 완료 처리 | 완료 상태에 따라 취소선을 표시하고 완료·취소 버튼을 전환합니다. |
+| 할 일 수정 | 수정 버튼을 누르면 Modal이 열리며 내용을 저장하거나 취소할 수 있습니다. |
 | 할 일 삭제 | 선택한 할 일을 목록에서 삭제합니다. |
 | 카테고리 필터 | 전체, 공부, 일상, 운동 카테고리별로 목록을 확인합니다. |
-| 상태 필터 | 전체, 완료, 미완료 상태별로 목록을 확인합니다. |
 | 정렬 | 최신순, 오래된순, 우선순위순으로 목록을 정렬합니다. |
 | 상세 페이지 | 선택한 todo의 내용, 카테고리, 우선순위, 완료 상태를 확인합니다. |
 | 데이터 영속화 | todo를 localStorage에 저장해 새로고침 후에도 유지합니다. |
 | 외부 Todo API | 저장된 todo가 없으면 JSONPlaceholder API에서 todo 10개를 불러옵니다. |
 | 로딩·에러 처리 | API 요청 중 스피너를 표시하고 실패하면 에러 메시지와 재시도 버튼을 제공합니다. |
 | 사용자 정보 | Random User API에서 프로필 사진, 이름, 이메일을 가져옵니다. |
+| 칸반보드 | 할 일, 진행 중, 완료 Column으로 todo를 구분합니다. |
+| 카드 상태 이동 | 버튼을 이용해 카드를 할 일·진행 중·완료 상태로 이동합니다. |
+| 상세 Modal | 카드 정보를 Modal에서 빠르게 확인합니다. |
+| 수정 Modal | Modal에서 todo 내용을 수정하고 저장하거나 취소합니다. |
+| Context 상태 관리 | BoardProvider에서 todo 상태와 변경 함수를 관리하고 공유합니다. |
 
 ## 페이지 구성
 
@@ -77,10 +96,20 @@ src/
 ├── api/
 │   └── todosApi.js
 ├── components/
-│   ├── TaskList.jsx
+│   ├── board/
+│   │   ├── Board.css
+│   │   ├── Board.jsx
+│   │   ├── Card.jsx
+│   │   └── Column.jsx
+│   ├── modal/
+│   │   ├── Modal.css
+│   │   ├── Modal.jsx
+│   │   ├── TodoDetailModal.jsx
+│   │   └── TodoEditModal.jsx
 │   ├── TextInput.jsx
-│   ├── TodoItem.jsx
 │   └── UserProfile.jsx
+├── context/
+│   └── BoardContext.jsx
 ├── hooks/
 │   └── useLocalStorage.js
 ├── pages/
@@ -93,7 +122,6 @@ src/
 ├── App.jsx
 └── main.jsx
 ```
-
 ## 기술 스택
 
 - React
@@ -130,5 +158,14 @@ npm run dev
 - 필터 결과를 별도 state로 저장하지 않는 derived state 구성
 - React Router를 활용한 페이지와 URL 분리
 - 숫자와 문자열 ID가 함께 존재하는 데이터 처리
+- Context API를 활용한 전역 상태 공유
+- Provider를 활용한 상태 관리와 UI 분리
+- `useBoard` 커스텀 훅을 활용한 Context 접근
+- props drilling 문제와 Context를 통한 해결
+- `children`을 활용한 컴포넌트 조합
+- compound component를 활용한 관련 컴포넌트 구조화
+- boolean 값 대신 명확한 `status`와 `type` 값 사용
+- `todo / doing / done` 상태를 이용한 칸반 카드 이동
+- 재사용 가능한 상세·수정 Modal 구현
 
 자세한 agent-skill 적용 내용은 [AGENT_SKILLS.md](./AGENT_SKILLS.md)에서 확인할 수 있습니다.
