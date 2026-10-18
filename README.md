@@ -61,6 +61,19 @@ React 스터디에서 진행한 주차별 과제를 기록하는 저장소입니
 - boolean 상태 대신 `modal.type`을 사용해 Modal 종류 구분
 - 기존 localStorage 데이터를 칸반 상태 구조로 변환
 
+### 5주차 - 성능 최적화
+
+- React DevTools Profiler로 컴포넌트 렌더링 원인 확인
+- 불필요하게 다시 렌더링되는 컴포넌트 확인
+- `React.memo`를 활용한 컴포넌트 렌더링 최적화
+- `useMemo`를 활용한 필터링·정렬 결과 계산 최적화
+- `useCallback`을 활용한 `addTodo` 함수 참조 유지
+- `React.lazy`와 `Suspense`를 활용한 페이지별 코드 스플리팅
+- `useTransition`을 활용한 카테고리 필터 업데이트 처리
+- `rollup-plugin-visualizer`를 활용한 번들 분석
+- barrel import 검색 및 확인
+- 
+
 ## 주요 기능
 
 | 기능 | 설명 |
@@ -132,6 +145,8 @@ src/
 - Web Storage API
 - JSONPlaceholder API
 - Random User API
+- React DevTools Profiler
+- rollup-plugin-visualizer
 
 ## 실행 방법
 
@@ -167,5 +182,13 @@ npm run dev
 - boolean 값 대신 명확한 `status`와 `type` 값 사용
 - `todo / doing / done` 상태를 이용한 칸반 카드 이동
 - 재사용 가능한 상세·수정 Modal 구현
+- Profiler로 렌더링 원인을 확인한 뒤 필요한 곳에 최적화 적용
+- `React.memo`로 props가 바뀌지 않은 컴포넌트의 불필요한 렌더링 방지
+- `useMemo`로 필터링·정렬 결과의 불필요한 재계산 방지
+- `useCallback`으로 memoized 자식 컴포넌트에 전달하는 함수 참조 유지
+- `lazy`와 `Suspense`를 활용한 라우트 단위 코드 스플리팅
+- `useTransition`을 활용한 낮은 우선순위 상태 업데이트 처리
+- 번들 분석 도구로 빌드 결과와 페이지별 청크 확인
+- barrel import 사용 여부 확인
 
 자세한 agent-skill 적용 내용은 [AGENT_SKILLS.md](./AGENT_SKILLS.md)에서 확인할 수 있습니다.
