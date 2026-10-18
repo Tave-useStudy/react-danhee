@@ -1289,6 +1289,42 @@ todo 상태가 `useReducer`, Zustand 또는 다른 방식으로 변경되어도 
 
 ---
 
+## 21. Profiler 기반 리렌더링 최적화
+
+### 문제 (내 코드)
+
+카테고리 필터를 바꿀 때 `MainPage`와 목록은 다시 렌더링되는 것이 자연스럽지만, 변경되지 않은 `TextInput`과 `UserProfile`도 함께 렌더링되는지 확인할 필요가 있었다.
+
+할 일 상태를 변경했을 때는 `BoardProvider`가 업데이트되면서 `addTodo` 함수가 새로 만들어져, `memo`를 적용한 `TextInput`에도 새 함수가 전달될 수 있었다.
+
+### 적용한 rules
+
+Profiler로 실제 렌더링 원인을 확인한 다음, 불필요한 재렌더링이 확인된 부분에만 최적화를 적용했다.
+
+- `React.memo`로 props가 바뀌지 않은 `TextInput`, `UserProfile`의 렌더링을 줄였다.
+- `useMemo`로 카테고리 필터링과 정렬 결과를 필요한 경우에만 다시 계산하도록 했다.
+- `useCallback`으로 `BoardContext`의 `addTodo` 함수 참조를 유지했다.
+
+### 결과
+
+Profiler에서 카테고리 필터 변경 시 목록은 다시 렌더링되지만 `TextInput`은 렌더링되지 않는 것을 확인했다. 할 일 상태 변경 시 발생하던 `TextInput`의 불필요한 렌더링은 `addTodo`에 `useCallback`을 적용해 줄였다.
+
+렌더 시간 숫자만 비교하기보다 어떤 컴포넌트가 왜 렌더링됐는지를 기준으로 확인했다.
+
+---
+
+## 22. 라우트 코드 스플리팅과 번들 분석
+
+### 적용한 rules
+
+- 페이지를 `React.lazy`로 불러오고 `Suspense`로 로딩 중 화면을 처리했다.
+- `rollup-plugin-visualizer`로 번들 분석 보고서를 생성했다.
+- 컴포넌트 폴더를 한꺼번에 불러오는 barrel import가 있는지 검색했다.
+
+### 결과
+
+빌드 결과에서 `MainPage`, `SettingsPage`, `TodoDetailPage`가 각각 별도의 JS 파일로 생성된 것을 확인했다. 번들 분석 보고서에서 메인 번들과 페이지별 청크를 확인했고, barrel import 검색 결과 수정할 항목은 없었다.
+
 # 기능 구현 과정에서 추가로 개선한 내용
 
 ## 1. 입력값 공백 제거와 20자 제한
@@ -1805,3 +1841,7 @@ API 요청 중에는 로딩 스피너가 나오고, 실패하면 오류 메시�
 - Effect와 Callback의 의존성 배열을 명확하게 작성했다.
 - 현재 구조에 불필요한 `Promise.all()`, `Set`, `Map`은 억지로 추가하지 않았다.
 - 숫자 ID와 API 문자열 ID를 상세 조회와 정렬에서 함께 처리했다.
+- React DevTools Profiler로 렌더링 원인을 확인하고 필요한 곳에만 최적화를 적용했다.
+- `React.memo`, `useMemo`, `useCallback`을 각각 컴포넌트 렌더링, 계산 결과, 함수 참조 최적화에 사용했다.
+- `lazy`와 `Suspense`로 페이지별 코드를 분리하고 번들 분석 도구로 빌드 결과를 확인했다.
+- barrel import 사용 여부를 검색해 확인했다.
