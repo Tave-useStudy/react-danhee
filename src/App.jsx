@@ -1,16 +1,18 @@
 import {useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { lazy, Suspense } from "react";
 import { initialTodoState,todoReducer } from './reducers/todoReducer';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { fetchTodos } from './api/todosApi';
 import { Routes, Route } from "react-router-dom";
 
-import MainPage from "./pages/MainPage";
-import TodoDetailPage from "./pages/TodoDetailPage";
-import SettingsPage from "./pages/SettingsPage";
+const MainPage = lazy(() => import("./pages/MainPage"));
+const TodoDetailPage = lazy(() => import("./pages/TodoDetailPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 
 export default function App() {
     return (
+      <Suspense fallback={<p>페이지 불러오는 중...</p>}>
       <Routes>
       <Route
         path="/"
@@ -27,5 +29,6 @@ export default function App() {
         element={<SettingsPage />}
       />
       </Routes>
+      </Suspense>
     );
   }

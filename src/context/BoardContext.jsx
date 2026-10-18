@@ -118,11 +118,8 @@
         };
     }, [loadApiTodos]);
 
-    const addTodo = (
-        text,
-        category,
-        priority
-    ) => {
+    const addTodo = useCallback(
+    (text, category, priority) => {
         const newTodo = {
         id: Date.now(),
         text,
@@ -135,7 +132,9 @@
         type: "ADD_TODO",
         payload: newTodo,
         });
-    };
+    },
+    []
+    );
 
     const moveTodo = (
         id,

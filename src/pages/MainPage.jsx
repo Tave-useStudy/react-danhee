@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useMemo, useState, useTransition} from "react";
 import { useNavigate } from "react-router-dom";
 import { useBoard } from "../context/BoardContext";
 
@@ -34,19 +34,22 @@ import styles from "./MainPage.module.css";
     } = useBoard();
 
         const [categoryFilter, setCategoryFilter] = useState("all");
+        const [isPending, startTransition] = useTransition();
         const [statusFilter, setStatusFilter] = useState("all");
         const [sortType, setSortType] = useState("latest");
 
         const navigate = useNavigate();
 
     //카테고리 필터
-    const categoryFilteredTodos = todos.filter((todo) => {
-        if(categoryFilter === "all") {
-            return true;
+const categoryFilteredTodos = useMemo(() => {
+    return todos.filter((todo) => {
+        if (categoryFilter === "all") {
+        return true;
         }
 
         return todo.category === categoryFilter;
     });
+    }, [todos, categoryFilter]);
 
     //우선순위 기준
     const priorityOrder = {
@@ -56,32 +59,32 @@ import styles from "./MainPage.module.css";
     };
 
     //정렬
-    const sortedTodos =
-    categoryFilteredTodos.toSorted((a, b) => {
+    const sortedTodos = useMemo(() => {
+    const priorityOrder = {
+        high: 1,
+        medium: 2,
+        low: 3,
+    };
+
+    return categoryFilteredTodos.toSorted((a, b) => {
         if (sortType === "priority") {
-            const aPriority =
-            priorityOrder[a.priority] ?? 999;
+        const aPriority = priorityOrder[a.priority] ?? 999;
+        const bPriority = priorityOrder[b.priority] ?? 999;
 
-            const bPriority =
-            priorityOrder[b.priority] ?? 999;
-
-            return aPriority - bPriority;
+        return aPriority - bPriority;
         }
 
         if (sortType === "oldest") {
-            return (
-            getTodoOrder(a) - getTodoOrder(b)
-            );
+        return getTodoOrder(a) - getTodoOrder(b);
         }
 
         if (sortType === "latest") {
-            return (
-            getTodoOrder(b) - getTodoOrder(a)
-            );
+        return getTodoOrder(b) - getTodoOrder(a);
         }
 
         return 0;
-        });
+    });
+    }, [categoryFilteredTodos, sortType]);
 
     if (status === "loading") {
     return (
@@ -129,7 +132,14 @@ import styles from "./MainPage.module.css";
 
         <h3>카테고리</h3>
 
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+        <select value={categoryFilter} onChange={(e) => {
+        const nextCategory = e.target.value;
+
+        startTransition(() => {
+        setCategoryFilter(nextCategory);
+        });
+    }}
+>
             <option value="all">전체</option>
             <option value="study">공부</option>
             <option value="daily">일상</option>

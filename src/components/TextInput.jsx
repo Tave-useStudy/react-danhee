@@ -1,6 +1,6 @@
-import {useState} from 'react'
+import {memo, useState} from 'react'
 
-export default function TextInput({addTodo}) {
+function TextInput({addTodo}) {
     const [value, setValue] = useState("");
     const [category, setCategory] = useState("study");
     const [priority, setPriority] = useState("medium");
@@ -41,3 +41,5 @@ export default function TextInput({addTodo}) {
         </div>
     );
 }
+
+export default memo(TextInput);

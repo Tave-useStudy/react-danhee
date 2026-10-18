@@ -1,6 +1,6 @@
-import {useEffect, useState} from 'react'
+import {memo, useEffect, useState} from 'react'
 
-export default function UserProfile() {
+function UserProfile() {
     const [user, setUser] = useState(null);
     const [error, setError] = useState("");
 
@@ -42,3 +42,5 @@ export default function UserProfile() {
         </div>
     );
 }
+
+export default memo(UserProfile);
